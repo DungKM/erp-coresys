@@ -28,7 +28,15 @@
  */
 
 header('Content-type: text/css; charset=UTF-8');
-header('Cache-Control: max-age=3600, public, must-revalidate');
+// Revalidate on every page: the browser gets a cheap 304 until this file changes, then the new CSS at once
+$etag = '"mui-'.md5(filemtime(__FILE__).'|'.(isset($_SERVER['QUERY_STRING']) ? $_SERVER['QUERY_STRING'] : '')).'"';
+header('Cache-Control: no-cache, public');
+header('ETag: '.$etag);
+header('Last-Modified: '.gmdate('D, d M Y H:i:s', filemtime(__FILE__)).' GMT');
+if (isset($_SERVER['HTTP_IF_NONE_MATCH']) && trim($_SERVER['HTTP_IF_NONE_MATCH']) === $etag) {
+	http_response_code(304);
+	exit;
+}
 
 $theme = (isset($_GET['theme']) && preg_match('/^[a-z0-9_]+$/i', $_GET['theme'])) ? $_GET['theme'] : 'eldy';
 $isprint = (isset($_GET['optioncss']) && $_GET['optioncss'] == 'print');
@@ -340,8 +348,49 @@ a.tmenulabel {
 li.tmenusel .mainmenuaspan { font-weight: 600 !important; }
 .tmenudisabled, a.tmenudisabled, span.mainmenuaspan.tmenudisabled { opacity: .45 !important; }
 
+/* ‹ › scroll buttons (added by JS when the entries overflow) */
+div#tmenu_tooltip, div#tmenu_tooltipinvert { position: relative; }
+.mui-tscroll {
+	position: absolute;
+	top: calc((var(--topbar-h) - 36px) / 2);
+	z-index: 3;
+	width: 36px;
+	height: 36px;
+	display: none;
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+	border: 1px solid var(--border);
+	border-radius: 50%;
+	background: var(--bg-surface);
+	color: var(--text-secondary);
+	box-shadow: var(--shadow-md);
+	cursor: pointer;
+	font-size: 12px;
+	transition: var(--transition);
+}
+.mui-tscroll:hover { color: var(--primary); border-color: #C7D2FE; background: var(--primary-soft); }
+.mui-tscroll-on .mui-tscroll { display: inline-flex; }
+.mui-tscroll-on.mui-at-start .mui-tscroll-prev, .mui-tscroll-on.mui-at-end .mui-tscroll-next { display: none; }
+/* soft fade on the clipped side */
+.mui-tscroll-on div.tmenudiv {
+	-webkit-mask-image: linear-gradient(to right, transparent 0, #000 48px, #000 calc(100% - 48px), transparent 100%);
+	mask-image: linear-gradient(to right, transparent 0, #000 48px, #000 calc(100% - 48px), transparent 100%);
+	scroll-behavior: smooth;
+}
+.mui-tscroll-on.mui-at-start div.tmenudiv {
+	-webkit-mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent 100%);
+	mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent 100%);
+}
+.mui-tscroll-on.mui-at-end div.tmenudiv {
+	-webkit-mask-image: linear-gradient(to right, transparent 0, #000 48px);
+	mask-image: linear-gradient(to right, transparent 0, #000 48px);
+}
+.mui-tscroll-on.mui-at-start.mui-at-end div.tmenudiv { -webkit-mask-image: none; mask-image: none; }
+
 /* Menu hider (hamburger) from Dolibarr */
-li.menuhider div.tmenucenter { padding: 0 10px !important; }
+li.menuhider div.tmenucenter { padding: 0 10px !important; gap: 0; }
+li.menuhider a.tmenulabel, li.menuhider span.tmenulabel, li.menuhider .mainmenuaspan { display: none !important; }
 
 /* ---------- User block (right side of the top bar) ---------- */
 div.login_block, div.login_block.usedropdown {
@@ -1304,8 +1353,15 @@ table.liste, table.noborder:not(.nobordernopadding):not(.table-fiche-title):not(
 	border: 1px solid var(--border) !important;
 	border-radius: var(--radius-card);
 	box-shadow: var(--shadow-sm);
-	overflow: hidden;
+	/* no overflow:hidden here: it would clip wide tables (e.g. payments block of an invoice) */
 }
+/* Rounded corners without clipping: round the corner cells instead */
+table.noborder > tbody > tr:first-child > :first-child, table.liste > tbody > tr:first-child > :first-child,
+table.noborder > thead > tr:first-child > :first-child, table.liste > thead > tr:first-child > :first-child { border-top-left-radius: var(--radius-card); }
+table.noborder > tbody > tr:first-child > :last-child, table.liste > tbody > tr:first-child > :last-child,
+table.noborder > thead > tr:first-child > :last-child, table.liste > thead > tr:first-child > :last-child { border-top-right-radius: var(--radius-card); }
+table.noborder > tbody > tr:last-child > :first-child, table.liste > tbody > tr:last-child > :first-child { border-bottom-left-radius: var(--radius-card); }
+table.noborder > tbody > tr:last-child > :last-child, table.liste > tbody > tr:last-child > :last-child { border-bottom-right-radius: var(--radius-card); }
 td table.noborder, .tabBar table.noborder, td table.liste, div.box table.noborder, form table.noborder table.noborder {
 	box-shadow: none !important;
 }
@@ -1330,6 +1386,92 @@ table.liste th, table.noborder th, .tagtable .liste_titre .tagtd, div.liste_titr
 	white-space: nowrap;
 }
 tr.liste_titre th a, tr.liste_titre td a, th.liste_titre a, tr.liste_titre_sel th a { color: var(--text-secondary) !important; font-weight: 600 !important; }
+/* Form controls placed inside a header row (old-style filters, e.g. Accounting > turnover reports) keep normal typography */
+tr.liste_titre .select2-container, tr.liste_titre select, tr.liste_titre input, tr.liste_titre label, tr.liste_titre .select2-selection__rendered,
+tr.liste_titre .select2-selection__placeholder, tr.liste_titre_filter .select2-container {
+	text-transform: none !important;
+	letter-spacing: 0 !important;
+	font-weight: 400 !important;
+	font-size: 13.5px !important;
+}
+/* Header cell used as a filter area → toolbar layout, one line per Dolibarr <br> */
+tr.liste_titre > td:has(.select2-container, select), tr.liste_titre > th:has(.select2-container, select) {
+	background: var(--bg-surface) !important;
+	text-transform: none !important;
+	letter-spacing: 0 !important;
+	font-weight: 400 !important;
+	color: var(--text-secondary) !important;
+	white-space: normal !important;
+	padding: 14px 16px !important;
+	vertical-align: middle;
+	line-height: 1;
+}
+/* Filter content is wrapped by JS into .mui-filterbar (the <td> itself must stay a table cell) */
+.mui-filterbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 8px; }
+.mui-filterbar > .mui-break { flex-basis: 100%; height: 0; margin: 0; }
+tr.mui-moved { display: none !important; }
+.mui-filtercard {
+	display: flex;
+	align-items: flex-start;
+	gap: 16px;
+	background: var(--bg-surface);
+	border: 1px solid var(--border);
+	border-radius: var(--radius-card);
+	box-shadow: var(--shadow-sm);
+	padding: 14px 16px;
+	margin: 0 0 16px;
+}
+.mui-filtercard .mui-filterbar { flex: 1 1 auto; min-width: 0; }
+.mui-filtercard .mui-filterbar .select2-container { width: 240px !important; max-width: 100%; }
+.mui-filtercard-actions { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; }
+.mui-filtercard-actions input[type="image"] {
+	width: 38px;
+	height: 38px;
+	padding: 10px;
+	box-sizing: border-box;
+	border: 1px solid var(--border);
+	border-radius: var(--radius-control);
+	background: var(--bg-surface);
+	box-shadow: var(--shadow-sm);
+	cursor: pointer;
+	transition: var(--transition);
+}
+.mui-filtercard-actions input[type="image"]:hover { background: var(--primary-soft); border-color: #C7D2FE; }
+@media only screen and (max-width: 767px) {
+	.mui-filtercard { flex-direction: column; }
+	.mui-filtercard .mui-filterbar .select2-container { width: 100% !important; }
+}
+.mui-filterbar > .pictofixedwidth {
+	width: 32px !important;
+	height: 32px;
+	display: inline-flex !important;
+	align-items: center;
+	justify-content: center;
+	border-radius: 8px;
+	background: var(--bg-hover);
+	color: var(--text-muted) !important;
+	opacity: 1 !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	flex: 0 0 32px;
+}
+.mui-filterbar .select2-container { min-width: 220px; margin: 0 !important; }
+.mui-filterbar label { color: var(--text-secondary) !important; font-size: 13px !important; margin: 0 12px 0 -2px !important; cursor: pointer; }
+.mui-filterbar input[type="checkbox"] { margin: 0 0 0 6px !important; }
+/* Old image search button (search.png) → icon button */
+tr.liste_titre input[type="image"][name="button_search"], input.liste_titre[type="image"] {
+	width: 36px;
+	height: 36px;
+	padding: 9px;
+	box-sizing: border-box;
+	border: 1px solid var(--border);
+	border-radius: var(--radius-control);
+	background: var(--bg-surface);
+	cursor: pointer;
+	transition: var(--transition);
+	vertical-align: middle;
+}
+tr.liste_titre input[type="image"][name="button_search"]:hover { background: var(--primary-soft); border-color: #C7D2FE; }
 tr.liste_titre_sel th, th.liste_titre_sel, tr.liste_titre th.liste_titre_sel, th.liste_titre_sel a { color: var(--primary) !important; }
 tr.liste_titre .fa, th .imgup, th .imgdown, th img.imgup, th img.imgdown { opacity: .8; }
 /* Filter row */
@@ -1341,7 +1483,7 @@ tr.liste_titre_filter td, tr.liste_titre_filter th, tr.liste_titre_filter {
 	letter-spacing: 0;
 }
 /* Body rows */
-tr.oddeven td, tr.pair td, tr.impair td, .tagtable .oddeven .tagtd, table.liste tr td, table.noborder tr:not(.liste_titre):not(.liste_titre_filter) td {
+tr.oddeven > td, tr.pair > td, tr.impair > td, .tagtable .oddeven > .tagtd, table.liste > tbody > tr > td, table.noborder > tbody > tr:not(.liste_titre):not(.liste_titre_filter) > td {
 	background: var(--bg-surface);
 	color: var(--text-primary);
 	border-top: 0 !important;
@@ -1361,7 +1503,8 @@ tr.liste_total td, tr.liste_total_wrap td, td.liste_total, tr.trforbreak td {
 	padding: 12px !important;
 }
 table.noborder > tbody > tr:first-child:not(.liste_titre) > td { border-top: 0 !important; }
-td.nobordernopadding, table.nobordernopadding td { border: 0 !important; padding: 0 !important; height: auto; background: transparent !important; }
+td.nobordernopadding, table.nobordernopadding td,
+table table.nobordernopadding > tbody > tr > td, table tr > td.nobordernopadding { border: 0 !important; padding: 0 !important; height: auto; background: transparent !important; }
 
 /* Pagination */
 div.pagination ul, ul.pagination { display: inline-flex; align-items: center; gap: 4px; padding: 0; margin: 0; }
@@ -1701,21 +1844,39 @@ div.error a, div.warning a, div.info a { color: inherit !important; text-decorat
 .dropdown dd ul, dl.dropdown dd ul { border: 1px solid var(--border) !important; border-radius: 10px !important; box-shadow: var(--shadow-lg) !important; background: var(--bg-surface) !important; padding: 6px !important; }
 
 /* Tooltips */
-.ui-tooltip, .ui-tooltip.mytooltip, div.ui-tooltip.ui-widget {
-	background: var(--text-primary) !important;
-	color: #F8FAFC !important;
-	border: 0 !important;
-	border-radius: 10px !important;
+/* Dolibarr tooltips are rich "object cards" (title, status badge, photo, label: value lines) → light card */
+.ui-tooltip, .ui-tooltip.mytooltip, div.ui-tooltip.ui-widget, div.ui-tooltip.ui-widget-content {
+	background: var(--bg-surface) !important;
+	color: var(--text-primary) !important;
+	border: 1px solid var(--border) !important;
+	border-radius: 12px !important;
 	box-shadow: var(--shadow-lg) !important;
-	padding: 8px 12px !important;
+	padding: 12px 16px !important;
 	font-family: var(--font) !important;
-	font-size: 12.5px !important;
-	line-height: 1.5 !important;
-	max-width: 420px;
+	font-size: 13px !important;
+	line-height: 1.65 !important;
+	max-width: 440px;
+	opacity: 1 !important;
 }
-.ui-tooltip *, .ui-tooltip a { color: #F8FAFC !important; }
-.ui-tooltip .opacitymedium { color: #CBD5E1 !important; }
+.ui-tooltip .ui-tooltip-content { color: var(--text-primary); }
+/* Title line: "<u>Bank account</u> <badge>" */
+.ui-tooltip u {
+	text-decoration: none !important;
+	font-weight: 600;
+	font-size: 14px;
+	color: var(--text-primary);
+	margin-right: 4px;
+}
+.ui-tooltip u:first-child ~ br:first-of-type { display: block; content: ""; margin-bottom: 6px; }
+/* Labels "Ref:" are printed in <b> */
+.ui-tooltip b, .ui-tooltip strong { font-weight: 500; color: var(--text-secondary); }
+.ui-tooltip a { color: var(--primary) !important; }
+.ui-tooltip .opacitymedium { color: var(--text-muted) !important; }
+.ui-tooltip hr { border: 0; border-top: 1px solid var(--border); margin: 8px 0; }
+.ui-tooltip .fa, .ui-tooltip .fas, .ui-tooltip .far { color: var(--primary); opacity: 1; }
+.ui-tooltip .badge { vertical-align: middle; margin-left: 2px; }
 .ui-tooltip img, .ui-tooltip .userphoto { filter: none; }
+.ui-tooltip img.photoref, .ui-tooltip .photoref { border-radius: 10px; }
 .classfortooltip .fa-info-circle, span.fa-info-circle, .fa-question-circle { color: var(--text-muted) !important; }
 
 /* Date picker */
@@ -2023,7 +2184,89 @@ html:lang(vi) .box-flex-item.info-box-module.--disabled .info-box-actions::befor
 	text-align: left !important;
 	transition: box-shadow .18s ease, transform .18s ease, border-color .18s ease;
 	min-height: 88px;
+	width: auto !important;
+	min-width: 170px;
+	max-width: none !important;
+	height: auto !important;
 }
+/* Stats boxes on object cards (thirdparty...) are smaller than the home KPIs */
+/* Containers of stats boxes (home widget "Database statistics", thirdparty card...) → responsive grid */
+td.tdwidgetstate, td.tdboxstats, div.tabBar td.tdboxstats {
+	display: grid !important;
+	grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+	gap: 12px;
+	padding: 16px !important;
+	height: auto !important;
+	box-sizing: border-box;
+	text-align: left !important;
+	background: var(--bg-surface) !important;
+}
+td.tdwidgetstate > br, td.tdboxstats > br { display: none; }
+td.tdwidgetstate > a.boxstatsindicator, td.tdboxstats > a.boxstatsindicator, td.tdwidgetstate > .boxstatsempty, td.tdwidgetstate > .boxstats150empty {
+	display: block !important;
+	width: auto !important;
+	min-width: 0 !important;
+	margin: 0 !important;
+}
+td.tdwidgetstate > .boxstatsempty, td.tdwidgetstate > .boxstats150empty, td.tdboxstats > .boxstatsempty { display: none !important; }
+td.tdwidgetstate .boxstats, td.tdboxstats .boxstats, td.tdboxstats .boxstats130 {
+	display: flex !important;
+	flex-direction: column;
+	justify-content: space-between;
+	gap: 8px;
+	width: 100% !important;
+	min-width: 0 !important;
+	min-height: 0;
+	height: 100% !important;
+	margin: 0 !important;
+	padding: 14px 16px !important;
+	box-sizing: border-box;
+}
+td.tdwidgetstate .boxstats > br, td.tdboxstats .boxstats > br { display: none; }
+td.tdwidgetstate .boxstatstext, td.tdboxstats .boxstatstext { font-size: 12.5px !important; white-space: nowrap; }
+td.tdwidgetstate .boxstats span.boxstatsindicator, td.tdboxstats .boxstats span.boxstatsindicator {
+	display: flex !important;
+	align-items: center;
+	gap: 10px;
+	margin: 0 !important;
+	font-size: 22px !important;
+	line-height: 1.2;
+	white-space: nowrap;
+}
+div.tabBar td.tdboxstats .boxstats span.boxstatsindicator { font-size: 18px !important; }
+/* Icon in a soft rounded square */
+td.tdwidgetstate span.boxstatsindicator > .fa, td.tdwidgetstate span.boxstatsindicator > .fas, td.tdwidgetstate span.boxstatsindicator > .far,
+td.tdwidgetstate span.boxstatsindicator > img {
+	flex: 0 0 34px;
+	width: 34px !important;
+	height: 34px;
+	border-radius: 9px;
+	display: inline-flex !important;
+	align-items: center;
+	justify-content: center;
+	font-size: 15px !important;
+	background: var(--primary-soft);
+	color: var(--primary) !important;
+	opacity: 1 !important;
+	padding: 0 !important;
+	margin: 0 !important;
+	box-sizing: border-box;
+}
+td.tdwidgetstate span.boxstatsindicator > img { padding: 7px !important; object-fit: contain; }
+/* Family colors by entity */
+td.tdwidgetstate a[href*="/user/"] span.boxstatsindicator > .fas, td.tdwidgetstate a[href*="/adherents/"] span.boxstatsindicator > .fas,
+td.tdwidgetstate a[href*="/holiday/"] span.boxstatsindicator > .fas, td.tdwidgetstate a[href*="/expensereport/"] span.boxstatsindicator > .fas { background: var(--fam-hr-bg); color: var(--fam-hr) !important; }
+td.tdwidgetstate a[href*="/societe/"] span.boxstatsindicator > .fas, td.tdwidgetstate a[href*="/contact/"] span.boxstatsindicator > .fas,
+td.tdwidgetstate a[href*="/comm/"] span.boxstatsindicator > .fas, td.tdwidgetstate a[href*="/commande/"] span.boxstatsindicator > .fas,
+td.tdwidgetstate a[href*="/ticket/"] span.boxstatsindicator > .fas, td.tdwidgetstate a[href*="/contrat/"] span.boxstatsindicator > .fas,
+td.tdwidgetstate a[href*="/fichinter/"] span.boxstatsindicator > .fas { background: var(--fam-crm-bg); color: var(--fam-crm) !important; }
+td.tdwidgetstate a[href*="/compta/"] span.boxstatsindicator > .fas, td.tdwidgetstate a[href*="/don/"] span.boxstatsindicator > .fas,
+td.tdwidgetstate a[href*="/bank/"] span.boxstatsindicator > .fas { background: var(--fam-fin-bg); color: var(--fam-fin) !important; }
+td.tdwidgetstate a[href*="/product/"] span.boxstatsindicator > .fas, td.tdwidgetstate a[href*="/expedition/"] span.boxstatsindicator > .fas,
+td.tdwidgetstate a[href*="/fourn/"] span.boxstatsindicator > .fas { background: var(--fam-prod-bg); color: var(--fam-prod) !important; }
+td.tdwidgetstate a[href*="/projet/"] span.boxstatsindicator > .fas, td.tdwidgetstate a[href*="/recruitment/"] span.boxstatsindicator > .fas,
+td.tdwidgetstate a[href*="/knowledgemanagement/"] span.boxstatsindicator > .fas, td.tdwidgetstate a[href*="/partnership/"] span.boxstatsindicator > .fas { background: var(--fam-proj-bg); color: var(--fam-proj) !important; }
+.tabBar .boxstats .boxstatstext { white-space: normal; }
 a.boxstatsindicator:hover .boxstats, .boxstats:hover { box-shadow: var(--shadow-md) !important; transform: translateY(-2px); border-color: #C7D2FE !important; }
 .boxstatstext, span.boxstatstext {
 	display: block;
@@ -2036,7 +2279,9 @@ a.boxstatsindicator:hover .boxstats, .boxstats:hover { box-shadow: var(--shadow-
 	text-overflow: ellipsis;
 	line-height: 1.4;
 }
-.boxstatsindicator, span.boxstatsindicator, .boxstats .boxstatsindicator, span.boxstatsindicator.thumbstat150 {
+/* "boxstatsindicator" is used both on the wrapping <a> and on the number <span> */
+a.boxstatsindicator { display: inline-block; vertical-align: top; font-size: inherit !important; margin: 0 !important; }
+span.boxstatsindicator, .boxstats span.boxstatsindicator {
 	display: block;
 	font-size: 28px !important;
 	font-weight: 700 !important;
@@ -2101,6 +2346,9 @@ body.bodylogin div#login_left, body.bodylogin div#login_right {
 }
 body.bodylogin div#login_left { margin-bottom: 28px; }
 body.bodylogin #img_logo, body.bodylogin .img_logo { max-height: 48px !important; max-width: 180px !important; border-radius: 8px; }
+.mui-login-brand { display: inline-flex; align-items: center; gap: 12px; }
+.mui-login-brand .mui-brand-mark { width: 44px; height: 44px; flex-basis: 44px; border-radius: 12px; font-size: 20px; }
+.mui-login-brand-name { font-size: 22px; font-weight: 700; letter-spacing: -.02em; color: var(--text-primary); }
 .mui-login-heading { margin: 0 0 28px; }
 .mui-login-heading h1 { font-size: 26px; font-weight: 700; letter-spacing: -.02em; margin: 0 0 6px; color: var(--text-primary); line-height: 1.25; }
 .mui-login-heading p { margin: 0; color: var(--text-secondary); font-size: 14px; }

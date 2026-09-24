@@ -1,0 +1,6 @@
+# Always revalidate the ModernUI script so updates are visible without Ctrl+F5 (cheap 304 when unchanged)
+<IfModule mod_headers.c>
+	<FilesMatch "\.js$">
+		Header set Cache-Control "no-cache, public"
+	</FilesMatch>
+</IfModule>

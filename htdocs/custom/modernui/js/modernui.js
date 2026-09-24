@@ -20,8 +20,9 @@
 	 * Configuration — edit texts shown in the brand block and login page
 	 * --------------------------------------------------------------------- */
 	var CONFIG = window.MODERNUI_CONFIG || {
-		brandName: 'Dolibarr ERP',
-		brandInitial: 'D',
+		brandName: 'Ommi ERP',
+		brandInitial: 'O',
+		showVersion: false,
 		loginTitle: 'Chào mừng trở lại',
 		loginSubtitle: 'Đăng nhập để tiếp tục làm việc với hệ thống.',
 		heroTitle: 'Quản trị doanh nghiệp tập trung trên một nền tảng',
@@ -84,7 +85,7 @@
 			brand.appendChild(el('span', 'mui-brand-name', escapeHtml(CONFIG.brandName)));
 		}
 		var version = doc.querySelector('span.aversion');
-		if (version && text(version)) {
+		if (CONFIG.showVersion && version && text(version)) {
 			brand.appendChild(el('span', 'mui-brand-version', 'v' + escapeHtml(text(version))));
 		}
 		doc.body.appendChild(brand);
@@ -114,6 +115,60 @@
 			var li = labels[i].closest('li');
 			if (li && !li.getAttribute('title')) li.setAttribute('title', text(labels[i]));
 		}
+	}
+
+	/* ---------------------------------------------------------------------
+	 * 2b. Top menu: ‹ › scroll buttons when entries do not fit
+	 * --------------------------------------------------------------------- */
+	function topMenuScroller() {
+		var bar = doc.querySelector('div#tmenu_tooltip, div#tmenu_tooltipinvert');
+		var scroller = bar && bar.querySelector('div.tmenudiv');
+		if (!scroller || bar.querySelector('.mui-tscroll')) return;
+
+		function makeBtn(dir) {
+			var b = el('button', 'mui-tscroll mui-tscroll-' + dir, '<span class="fas fa-chevron-' + (dir === 'prev' ? 'left' : 'right') + '"></span>');
+			b.type = 'button';
+			b.setAttribute('aria-label', dir === 'prev' ? 'Previous' : 'Next');
+			b.addEventListener('click', function (e) {
+				e.preventDefault();
+				var step = Math.max(160, Math.round(scroller.clientWidth * 0.6));
+				scroller.scrollBy({ left: dir === 'prev' ? -step : step, behavior: 'smooth' });
+			});
+			bar.appendChild(b);
+			return b;
+		}
+		var prev = makeBtn('prev');
+		var next = makeBtn('next');
+
+		function update() {
+			var barRect = bar.getBoundingClientRect();
+			var r = scroller.getBoundingClientRect();
+			prev.style.left = (r.left - barRect.left) + 'px';
+			next.style.left = (r.right - barRect.left - 36) + 'px';
+			var max = scroller.scrollWidth - scroller.clientWidth;
+			var overflow = max > 2;
+			bar.classList.toggle('mui-tscroll-on', overflow);
+			bar.classList.toggle('mui-at-start', !overflow || scroller.scrollLeft <= 2);
+			bar.classList.toggle('mui-at-end', !overflow || scroller.scrollLeft >= max - 2);
+		}
+		scroller.addEventListener('scroll', update, { passive: true });
+		window.addEventListener('resize', update);
+		// Mouse wheel scrolls the menu horizontally
+		scroller.addEventListener('wheel', function (e) {
+			if (scroller.scrollWidth <= scroller.clientWidth || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+			scroller.scrollLeft += e.deltaY;
+			e.preventDefault();
+		}, { passive: false });
+		// Keep the current entry visible
+		var sel = scroller.querySelector('li.tmenusel');
+		if (sel) {
+			var sr = sel.getBoundingClientRect(), cr = scroller.getBoundingClientRect();
+			if (sr.right > cr.right - 40 || sr.left < cr.left + 40) {
+				scroller.scrollLeft += (sr.left - cr.left) - (cr.width - sr.width) / 2;
+			}
+		}
+		update();
+		setTimeout(update, 300); // after webfont load
 	}
 
 	/* ---------------------------------------------------------------------
@@ -270,11 +325,63 @@
 	}
 
 	/* ---------------------------------------------------------------------
+	 * 6b. Old-style filters printed inside a header cell → wrap for a flex toolbar
+	 * --------------------------------------------------------------------- */
+	function filterBars() {
+		var cells = doc.querySelectorAll('tr.liste_titre > td');
+		for (var i = 0; i < cells.length; i++) {
+			var td = cells[i];
+			var nbsel = td.querySelectorAll('select').length;
+			if (td.querySelector('.mui-filterbar') || !nbsel || (nbsel < 2 && !td.querySelector('input[type="checkbox"]'))) continue;
+			var bar = el('div', 'mui-filterbar');
+			while (td.firstChild) {
+				var n = td.firstChild;
+				if (n.nodeType === 1 && n.tagName === 'BR') { // <br> is ignored inside flex: use a real line break item
+					td.removeChild(n);
+					bar.appendChild(el('span', 'mui-break'));
+				} else {
+					bar.appendChild(n); // moving nodes keeps select2 bindings
+				}
+			}
+			td.appendChild(bar);
+
+			// A header row that only holds filters (+ a search button) is moved above the table as a full width
+			// toolbar card. It stays inside the same <form>, so submitted fields do not change.
+			var tr = td.parentNode;
+			var table = tr.closest('table');
+			var form = table && table.closest('form');
+			var onlyFilters = true;
+			for (var k = 0; k < tr.children.length; k++) {
+				var c = tr.children[k];
+				if (c !== td && text(c) && !c.querySelector('input, select, button')) onlyFilters = false;
+			}
+			if (!form || !onlyFilters || tr.parentNode.firstElementChild !== tr) continue;
+			var card = el('div', 'mui-filtercard');
+			card.appendChild(bar);
+			var actions = el('div', 'mui-filtercard-actions');
+			for (var m = 0; m < tr.children.length; m++) {
+				if (tr.children[m] === td) continue;
+				while (tr.children[m].firstChild) actions.appendChild(tr.children[m].firstChild);
+			}
+			if (actions.childNodes.length) card.appendChild(actions);
+			var anchor = table.parentNode.classList.contains('div-table-responsive') || table.parentNode.classList.contains('div-table-responsive-no-min') ? table.parentNode : table;
+			anchor.parentNode.insertBefore(card, anchor);
+			tr.classList.add('mui-moved');
+		}
+	}
+
+	/* ---------------------------------------------------------------------
 	 * 7. Login page: heading + gradient hero panel
 	 * --------------------------------------------------------------------- */
 	function loginPage() {
 		var body = doc.body;
 		if (!body.classList.contains('bodylogin') || doc.querySelector('.mui-login-hero')) return;
+		// Default Dolibarr logo → brand logo (a company logo uploaded in setup is kept)
+		var logo = doc.getElementById('img_logo');
+		if (logo && /dolibarr_logo|dolibarr\.png|dolibarr_256|dolibarr_512/i.test(logo.getAttribute('src') || '')) {
+			var brand = el('div', 'mui-login-brand', '<span class="mui-brand-mark">' + escapeHtml(CONFIG.brandInitial) + '</span><span class="mui-login-brand-name">' + escapeHtml(CONFIG.brandName) + '</span>');
+			logo.parentNode.replaceChild(brand, logo);
+		}
 		var right = doc.getElementById('login_right');
 		if (right && !doc.querySelector('.mui-login-heading')) {
 			var h = el('div', 'mui-login-heading', '<h1>' + escapeHtml(CONFIG.loginTitle) + '</h1><p>' + escapeHtml(CONFIG.loginSubtitle) + '</p>');
@@ -326,7 +433,7 @@
 
 	/* --------------------------------------------------------------------- */
 	ready(function () {
-		var steps = [loginPage, buildBrand, topMenuTooltips, markLeftMenu, markPageTitle, segmentedButtons, moduleFamilies, commandBar];
+		var steps = [loginPage, buildBrand, topMenuTooltips, topMenuScroller, markLeftMenu, markPageTitle, segmentedButtons, moduleFamilies, filterBars, commandBar];
 		for (var i = 0; i < steps.length; i++) {
 			try {
 				steps[i]();
