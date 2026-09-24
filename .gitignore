@@ -1,0 +1,63 @@
+# ---------------------------------------------------------------
+# Dolibarr - cấu hình theo môi trường (chứa mật khẩu DB)
+# ---------------------------------------------------------------
+htdocs/conf/conf.php
+htdocs/conf/conf.php.old
+htdocs/conf/conf.php.*
+!htdocs/conf/conf.php.example
+install.lock
+
+# ---------------------------------------------------------------
+# Thư mục dữ liệu Dolibarr (file đính kèm, PDF sinh ra, log, backup...)
+# Giữ lại .htaccess và mẫu in tùy chỉnh (doctemplates)
+# ---------------------------------------------------------------
+/documents/*
+!/documents/.htaccess
+!/documents/doctemplates/
+
+# Backup DB, export, log
+*.sql.gz
+*.sql.bz2
+*.sql.zst
+/documents/admin/backup/
+*.log
+dolibarr*.log
+
+# ---------------------------------------------------------------
+# Composer / Node
+# ---------------------------------------------------------------
+/vendor/
+node_modules/
+composer.lock
+composer.phar
+
+# ---------------------------------------------------------------
+# Cache, file tạm
+# ---------------------------------------------------------------
+cache/
+tmp/
+var/cache/
+var/log/
+*.tmp
+*.bak
+*.swp
+*~
+
+# ---------------------------------------------------------------
+# IDE / hệ điều hành
+# ---------------------------------------------------------------
+.idea/
+.vscode/
+.settings/
+.project
+.buildpath
+.phpunit.result.cache
+.phan/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---------------------------------------------------------------
+# Công cụ AI / agent (cục bộ)
+# ---------------------------------------------------------------
+.claude/
