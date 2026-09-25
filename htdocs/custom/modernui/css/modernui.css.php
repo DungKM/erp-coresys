@@ -1168,6 +1168,10 @@ input.maxwidthdate, input.maxwidthdateonsmartphone, input[id$="day"][type="text"
 }
 select, select.flat, form.flat select { height: var(--control-h); padding: 0 32px 0 12px !important; }
 select[multiple], select[size]:not([size="1"]) { height: auto; padding: 6px 8px !important; }
+/* Day / month / year pickers: core forces maxwidth75imp/width75, which truncates values once our select padding applies */
+select.flat[name$="day"], select.flat[name$="month"], select.flat[name$="year"] {
+	width: auto !important; max-width: none !important; min-width: 72px; padding: 0 30px 0 10px !important; margin-right: 6px;
+}
 textarea, textarea.flat { padding: 10px 12px !important; line-height: 1.5; min-height: 38px; }
 input:hover:not(:focus):not([type="checkbox"]):not([type="radio"]):not(.button):not([type="submit"]), select:hover:not(:focus), textarea:hover:not(:focus) { border-color: var(--border-strong) !important; }
 
