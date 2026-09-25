@@ -1169,6 +1169,8 @@ input.maxwidthdate, input.maxwidthdateonsmartphone, input[id$="day"][type="text"
 select, select.flat, form.flat select { height: var(--control-h); padding: 0 32px 0 12px !important; }
 select[multiple], select[size]:not([size="1"]) { height: auto; padding: 6px 8px !important; }
 /* Day / month / year pickers: core forces maxwidth75imp/width75, which truncates values once our select padding applies */
+/* Short number inputs (agenda per-user filter: days 1-7, hours 0-24): core width + our 12px padding + spinner clips the value */
+input[type="number"].shortbis { width: 64px !important; min-width: 64px; padding: 0 4px 0 10px !important; }
 select.flat[name$="day"], select.flat[name$="month"], select.flat[name$="year"] {
 	width: auto !important; max-width: none !important; min-width: 72px; padding: 0 30px 0 10px !important; margin-right: 6px;
 }
@@ -1749,7 +1751,9 @@ div.error a, div.warning a, div.info a { color: inherit !important; text-decorat
 
 /* jQuery UI dialogs */
 .ui-widget-overlay, .ui-widget-overlay.ui-front { background: rgba(15, 23, 42, .45) !important; opacity: 1 !important; backdrop-filter: blur(2px); z-index: 1030 !important; }
-.ui-dialog.ui-front { z-index: 1031 !important; }
+/* Core md/eldy pins dialogs at 1005 !important with a 6-class selector, which would leave them under our 1030 overlay (blurred).
+   The repeated class only raises specificity; .highlight (tooltip dialogs, 3000 in core) is left alone. */
+body .ui-dialog.ui-front.ui-front.ui-front.ui-front.ui-front:not(.highlight) { z-index: 1031 !important; }
 .ui-dialog ~ .select2-container--open, body > .select2-container--open { z-index: 1040; }
 .ui-dialog, .ui-dialog.ui-widget, .ui-dialog.ui-widget-content {
 	border: 0 !important;
